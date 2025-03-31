@@ -16,11 +16,15 @@ public class SwiftAzureSpeechRecognitionPlugin: NSObject, FlutterPlugin {
     var continousSpeechRecognizer: SPXSpeechRecognizer? = nil
     var simpleRecognitionTasks: Dictionary<String, SimpleRecognitionTask> = [:]
     
+    var recognizer: SPXKeywordRecognizer?
+    var speechConfig: SPXSpeechConfiguration?
+    
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "azure_speech_recognition", binaryMessenger: registrar.messenger())
         let instance: SwiftAzureSpeechRecognitionPlugin = SwiftAzureSpeechRecognitionPlugin(azureChannel: channel)
         registrar.addMethodCallDelegate(instance, channel: channel)
     }
+    
     init(azureChannel: FlutterMethodChannel) {
         self.azureChannel = azureChannel
     }
@@ -72,6 +76,23 @@ public class SwiftAzureSpeechRecognitionPlugin: NSObject, FlutterPlugin {
         }
         else if (call.method == "stopContinuousStream") {
             stopContinuousStream(flutterResult: result)
+        }
+        else if (call.method == "startKeywordRecognition") {
+            print("Called startKeywordRecognition")
+            if let args = call.arguments as? [String: Any],
+               let modelPath = args["keywordModelPath"] as? String {
+                startKeywordRecognition(
+                    speechSubscriptionKey: speechSubscriptionKey,
+                    serviceRegion: serviceRegion,
+                    modelPath: modelPath,
+                    flutterResult: result
+                );
+            } else {
+                result(FlutterError(code: "INVALID_ARGUMENT", message: "Missing modelPath", details: nil))
+            }
+        }
+        else if (call.method == "stopKeywordRecognition") {
+            stopKeywordRecognition(result: result)
         }
         else {
             result(FlutterMethodNotImplemented)
@@ -348,4 +369,48 @@ public class SwiftAzureSpeechRecognitionPlugin: NSObject, FlutterPlugin {
             }
         }
     }
+    
+    func startKeywordRecognition(
+                                 speechSubscriptionKey: String,
+                                 serviceRegion: String,
+                                 modelPath: String,
+                                 flutterResult: @escaping FlutterResult
+    ) {
+        do {
+            do {
+                try speechConfig = SPXSpeechConfiguration(subscription: speechSubscriptionKey, region: serviceRegion)
+            } catch {
+                print("error \(error) happened")
+                speechConfig = nil
+            }
+            let audioConfig = SPXAudioConfiguration()
+            let keywordModel = try SPXKeywordRecognitionModel(fromFile: modelPath)
+            recognizer = try! SPXKeywordRecognizer(audioConfig)
+            try recognizer?.recognizeOnceAsync({ result in
+                if result.reason == SPXResultReason.recognizedKeyword {
+                    print("Wake word recognized: \(result.text ?? "Unknown")")
+                    flutterResult("SPXResultReason.recognizedKeyword");
+                } else if result.reason == SPXResultReason.noMatch {
+                    flutterResult("SPXResultReason.noMatch");
+                } else {
+                    print("Recognition failed with reason: \(String(describing: result.reason))")
+                    flutterResult(String(describing: result.reason));
+                }
+            }, keywordModel: keywordModel)
+        } catch {
+            flutterResult(FlutterError(code: "ERROR", message: "Failed to start wake word recognition", details: error.localizedDescription))
+        }
+    }
+
+    func stopKeywordRecognition(result: @escaping FlutterResult) {
+        do {
+            try recognizer?.stopRecognitionAsync({b, error  in return})
+            recognizer = nil
+            print("Stopped Wake Word Detection.")
+            result(nil)
+        } catch {
+            result(FlutterError(code: "ERROR", message: "Failed to stop wake word recognition", details: error.localizedDescription))
+        }
+    }
+
 }

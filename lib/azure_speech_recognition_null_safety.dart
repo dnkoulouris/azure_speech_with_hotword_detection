@@ -104,6 +104,29 @@ class AzureSpeechRecognition {
   void setStartHandler(VoidCallback handler) =>
       startRecognitionHandler = handler;
 
+  Future<bool> startKeywordRecognition(String keywordModelPath) async {
+    if ((_subKey == null || _region == null)) {
+      throw "Error: SpeechRecognitionParameters not initialized correctly";
+    }
+
+    var result = await _channel.invokeMethod('startKeywordRecognition', {
+      'language': _lang,
+      'subscriptionKey': _subKey,
+      'region': _region,
+      'timeout': _timeout,
+      'keywordModelPath': keywordModelPath,
+    });
+    if (result is String && result == "SPXResultReason.recognizedKeyword") {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  void stopKeywordRecognition(String keywordModelPath) {
+    _channel.invokeMethod('stopKeywordRecognition');
+  }
+
   /// only for continuosly
   void setRecognitionStoppedHandler(VoidCallback handler) =>
       recognitionStoppedHandler = handler;
