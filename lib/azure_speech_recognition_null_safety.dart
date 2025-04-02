@@ -52,6 +52,7 @@ class AzureSpeechRecognition {
   VoidCallback? recognitionStartedHandler;
   VoidCallback? startRecognitionHandler;
   VoidCallback? recognitionStoppedHandler;
+  VoidCallback? onKeywordHandler;
 
   Future _platformCallHandler(MethodCall call) async {
     switch (call.method) {
@@ -75,6 +76,9 @@ class AzureSpeechRecognition {
         break;
       case "speech.onException":
         exceptionHandler!(call.arguments);
+        break;
+      case "speech.onKeyword":
+        onKeywordHandler?.call();
         break;
       default:
         print("Error: method called not found");
@@ -104,23 +108,21 @@ class AzureSpeechRecognition {
   void setStartHandler(VoidCallback handler) =>
       startRecognitionHandler = handler;
 
-  Future<bool> startKeywordRecognition(String keywordModelPath) async {
+  /// Handler that fires when a keyword is detected
+  void setOnKeywordHandler(VoidCallback handler) =>
+      onKeywordHandler = handler;
+
+  void startKeywordRecognition(String keywordModelPath) {
     if ((_subKey == null || _region == null)) {
       throw "Error: SpeechRecognitionParameters not initialized correctly";
     }
-
-    var result = await _channel.invokeMethod('startKeywordRecognition', {
+    _channel.invokeMethod('startKeywordRecognition', {
       'language': _lang,
       'subscriptionKey': _subKey,
       'region': _region,
       'timeout': _timeout,
       'keywordModelPath': keywordModelPath,
     });
-    if (result is String && result == "SPXResultReason.recognizedKeyword") {
-      return true;
-    } else {
-      return false;
-    }
   }
 
   void stopKeywordRecognition() {
