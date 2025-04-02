@@ -376,30 +376,43 @@ public class SwiftAzureSpeechRecognitionPlugin: NSObject, FlutterPlugin {
                                  modelPath: String,
                                  flutterResult: @escaping FlutterResult
     ) {
-        do {
+        print("Starting keyword recognition for model in: " + modelPath)
+        
+        copyAssetToTemp(assetKey: modelPath) { tempFilePath in
+                    guard let filePath = tempFilePath else {
+                        print("Failed to load asset from Flutter")
+                        flutterResult("Invalid file");
+                        return
+                    }
             do {
-                try speechConfig = SPXSpeechConfiguration(subscription: speechSubscriptionKey, region: serviceRegion)
-            } catch {
-                print("error \(error) happened")
-                speechConfig = nil
-            }
-            let audioConfig = SPXAudioConfiguration()
-            let keywordModel = try SPXKeywordRecognitionModel(fromFile: modelPath)
-            recognizer = try! SPXKeywordRecognizer(audioConfig)
-            try recognizer?.recognizeOnceAsync({ result in
-                if result.reason == SPXResultReason.recognizedKeyword {
-                    print("Wake word recognized: \(result.text ?? "Unknown")")
-                    flutterResult("SPXResultReason.recognizedKeyword");
-                } else if result.reason == SPXResultReason.noMatch {
-                    flutterResult("SPXResultReason.noMatch");
-                } else {
-                    print("Recognition failed with reason: \(String(describing: result.reason))")
-                    flutterResult(String(describing: result.reason));
+                do {
+                    try self.speechConfig = SPXSpeechConfiguration(subscription: speechSubscriptionKey, region: serviceRegion)
+                } catch {
+                    print("error \(error) happened")
+                    self.speechConfig = nil
                 }
-            }, keywordModel: keywordModel)
-        } catch {
-            flutterResult(FlutterError(code: "ERROR", message: "Failed to start wake word recognition", details: error.localizedDescription))
-        }
+                let audioConfig = SPXAudioConfiguration()
+                
+                
+                let keywordModel = try SPXKeywordRecognitionModel(fromFile: tempFilePath!)
+                self.recognizer = try! SPXKeywordRecognizer(audioConfig)
+                try self.recognizer?.recognizeOnceAsync({ result in
+                    if result.reason == SPXResultReason.recognizedKeyword {
+                        print("Wake word recognized: \(result.text ?? "Unknown")")
+                        flutterResult("SPXResultReason.recognizedKeyword");
+                    } else if result.reason == SPXResultReason.noMatch {
+                        flutterResult("SPXResultReason.noMatch");
+                    } else {
+                        print("Recognition failed with reason: \(String(describing: result.reason))")
+                        flutterResult(String(describing: result.reason));
+                    }
+                }, keywordModel: keywordModel)
+            } catch {
+                flutterResult(FlutterError(code: "ERROR", message: "Failed to start wake word recognition", details: error.localizedDescription))
+            }
+            
+            
+                }
     }
 
     func stopKeywordRecognition(result: @escaping FlutterResult) {
@@ -411,6 +424,31 @@ public class SwiftAzureSpeechRecognitionPlugin: NSObject, FlutterPlugin {
         } catch {
             result(FlutterError(code: "ERROR", message: "Failed to stop wake word recognition", details: error.localizedDescription))
         }
+    }
+    
+    
+    func copyAssetToTemp(assetKey: String, completion: @escaping (String?) -> Void) {
+        guard let flutterAssetPath = Bundle.main.path(forResource: assetKey, ofType: nil) else {
+            print("Error: Asset not found in Flutter bundle")
+            completion(nil)
+            return
+        }
+
+        let fileManager = FileManager.default
+        let tempDirectory = NSTemporaryDirectory()
+        let tempFilePath = (tempDirectory as NSString).appendingPathComponent(assetKey)
+
+        if !fileManager.fileExists(atPath: tempFilePath) {
+            do {
+                try fileManager.copyItem(atPath: flutterAssetPath, toPath: tempFilePath)
+                print("File copied to: \(tempFilePath)")
+            } catch {
+                print("Error copying file: \(error.localizedDescription)")
+                completion(nil)
+                return
+            }
+        }
+        completion(tempFilePath)
     }
 
 }

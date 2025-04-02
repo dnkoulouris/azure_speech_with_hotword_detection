@@ -123,7 +123,7 @@ class AzureSpeechRecognition {
     }
   }
 
-  void stopKeywordRecognition(String keywordModelPath) {
+  void stopKeywordRecognition() {
     _channel.invokeMethod('stopKeywordRecognition');
   }
 
