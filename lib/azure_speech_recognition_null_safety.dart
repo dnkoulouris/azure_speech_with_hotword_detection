@@ -125,7 +125,7 @@ class AzureSpeechRecognition {
     });
   }
 
-  void stopKeywordRecognition() {
+  static void stopKeywordRecognition() {
     _channel.invokeMethod('stopKeywordRecognition');
   }
 

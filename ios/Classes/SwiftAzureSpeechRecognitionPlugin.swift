@@ -83,6 +83,7 @@ public class SwiftAzureSpeechRecognitionPlugin: NSObject, FlutterPlugin {
             result(true)
         } else if call.method == "stopContinuousStream" {
             stopContinuousStream(flutterResult: result)
+//            stopKeywordRecognition()
         } else if call.method == "startKeywordRecognition" {
             if let args = call.arguments as? [String: Any],
                 let modelPath = args["keywordModelPath"] as? String
@@ -442,6 +443,7 @@ public class SwiftAzureSpeechRecognitionPlugin: NSObject, FlutterPlugin {
         serviceRegion: String,
         tempFilePath: String
     ) {
+        print("Starting KeywordRecognition of file " + tempFilePath)
         do {
             do {
                 try self.speechConfig = SPXSpeechConfiguration(
@@ -450,20 +452,23 @@ public class SwiftAzureSpeechRecognitionPlugin: NSObject, FlutterPlugin {
                 print("error \(error) happened")
                 self.speechConfig = nil
             }
+            
             let audioConfig = SPXAudioConfiguration()
-
             let keywordModel = try SPXKeywordRecognitionModel(fromFile: tempFilePath)
             self.recognizer = try! SPXKeywordRecognizer(audioConfig)
 
             try self.recognizer?.recognizeOnceAsync(
                 { result in
-
+                    
                     if result.reason == SPXResultReason.recognizedKeyword {
                         print("Wake word recognized: \(result.text ?? "Unknown")")
                         self.azureChannel.invokeMethod("speech.onKeyword", arguments: "")
-                        
+                    } else if (result.reason == SPXResultReason.canceled) {
+                        print("canceled current rec process")
+                        return;
                     }
 
+                    print("starting again")
                     /// Start again the rec
                     self.startKeywordRecognition(
                         speechSubscriptionKey: speechSubscriptionKey, serviceRegion: serviceRegion,
@@ -485,9 +490,9 @@ public class SwiftAzureSpeechRecognitionPlugin: NSObject, FlutterPlugin {
             try recognizer?.stopRecognitionAsync({ b, error in return })
             recognizer = nil
             print("Stopped Wake Word Detection.")
-            self.azureChannel.invokeMethod("speech.stoppedKeywordRecognition", arguments: "")
+//            self.azureChannel.invokeMethod("speech.stoppedKeywordRecognition", arguments: "")
         } catch {
-            self.azureChannel.invokeMethod("speech.stoppedKeywordRecognitionError", arguments: "")
+//            self.azureChannel.invokeMethod("speech.stoppedKeywordRecognitionError", arguments: "")
         }
     }
 
